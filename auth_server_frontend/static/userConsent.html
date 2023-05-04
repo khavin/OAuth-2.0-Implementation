@@ -1,0 +1,237 @@
+<html>
+
+<head>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&family=Source+Code+Pro&display=swap"
+        rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+        }
+
+        .site-header {
+            display: flex;
+            justify-content: center;
+        }
+
+        .site-header-content {
+            padding: 0.5rem;
+            border: 2px solid black;
+        }
+
+        .task-title {
+            margin: 1rem;
+            display: flex;
+            justify-content: center;
+        }
+
+        .form-label {
+            display: inline-block;
+            margin-bottom: 0.25rem;
+        }
+
+        #userLoginForm,
+        #consentForm {
+            margin: 1rem;
+            display: flex;
+            justify-content: center;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #userLoginForm form {
+            width: 15rem;
+        }
+
+        #userLoginForm form input {
+            width: 100%;
+            padding: 0.5rem;
+        }
+
+        #errorMsg {
+            width: 15rem;
+            color: #EF0107;
+        }
+
+        .submit-button-row {
+            display: flex;
+        }
+
+        .submit-button {
+            cursor: pointer;
+            padding: 0.5rem 1rem;
+            background-color: #1A1F71;
+            color: white;
+            border-radius: 0.5rem;
+        }
+
+        #consentMsgTitle {
+            display: flex;
+            justify-content: center;
+        }
+
+        #consentMsgBody {
+            margin: 1rem 0;
+            display: flex;
+            justify-content: center;
+        }
+
+        .scopes {
+            padding: 1rem;
+            border: 2px solid black;
+            font-family: 'Source Code Pro', monospace;
+        }
+
+        .consent-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 0.25rem;
+        }
+
+        .deny-button,
+        .allow-button {
+            padding: 0.25rem;
+            border: 2px solid #1A1F71;
+            border-radius: 0.25rem;
+        }
+
+        .deny-button:hover,
+        .allow-button:hover {
+            background-color: #1A1F71;
+            color: white;
+            cursor: pointer;
+        }
+
+        #errorMsg,
+        #consentForm,
+        #errorMsgConsent {
+            display: none;
+        }
+    </style>
+</head>
+<script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const redirect_uri = urlParams.get('redirect_uri');
+    const client_id = urlParams.get('client_id');
+    const scope = urlParams.get('scope');
+    const response_type = urlParams.get('response_type');
+    const state = urlParams.get('state');
+    let jwt;
+
+    function waitForElm(selector) {
+        return new Promise(resolve => {
+            if (document.querySelector(selector)) {
+                return resolve(document.querySelector(selector));
+            }
+
+            const observer = new MutationObserver(mutations => {
+                if (document.querySelector(selector)) {
+                    resolve(document.querySelector(selector));
+                    observer.disconnect();
+                }
+            });
+
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+        });
+    }
+
+    function submit() {
+        document.getElementById("errorMsg").style.display = "none";
+        let email = document.getElementById("email").value;
+        let password = document.getElementById("password").value;
+
+        let payload = {
+            "email": email,
+            "password": password,
+            "client_id": client_id,
+            "scope": scope
+        }
+
+        fetch("http://localhost:8000/auth", {
+            method: "POST",
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+            .then(res => res.json().then(data => ({ status: res.status, body: data })))
+            .then(resObj => {
+                if (resObj["status"] == 200) {
+                    document.getElementById("userLoginForm").style.display = "none";
+                    document.getElementById("consentForm").style.display = "block";
+                    jwt = resObj["body"];
+                    waitForElm('#consentMsgTitle').then((elm) => {
+                        elm.innerHTML = "<span>" + client_id + " is requesting access to the following information:" + "</span>";
+                    });
+                    waitForElm('#consentMsgBody').then((elm) => {
+                        elm.innerHTML = "<span class='scopes'>" + scope + "</span>";
+                    });
+                } else {
+                    document.getElementById("errorMsg").style.display = "block";
+                }
+            })
+    };
+
+    function consentAllow() {
+        fetch("http://localhost:8000/consent", {
+            method: "GET",
+            headers: { 'Authorization': 'Bearer ' + jwt }
+        })
+            .then(res => res.json().then(data => ({ status: res.status, body: data })))
+            .then(resObj => {
+                if (resObj["status"] == 200) {
+                    window.location.replace(redirect_uri + "?code=" + resObj["body"]["authCode"] + "&state=" + state);
+                } else {
+                    document.getElementById("errorMsgConsent").style.display = "block";
+                }
+            })
+    }
+
+    function consentDeny() {
+        window.location.replace(redirect_uri + "?error=access_denied&error_description=the user did not consent");
+    }
+
+</script>
+
+<body>
+    <div class="site-header">
+        <div class="site-header-content">
+            Profile.com
+        </div>
+    </div>
+
+    <div id="userLoginForm">
+        <div class="task-title">
+            Please login to profile.com
+        </div>
+        <form>
+            <label class="form-label" for="email">Email:</label><br>
+            <input type="text" id="email" name="email"><br><br>
+            <label class="form-label" for="password">Password:</label><br>
+            <input type="password" id="password" name="password"><br><br>
+            <div class="submit-button-row">
+                <div class="submit-button" onclick="submit()">Submit</div>
+            </div>
+        </form>
+        <div id="errorMsg">Invalid Credentials</div>
+    </div>
+    <div id="consentForm">
+        <div class="task-title">
+            Consent form
+        </div>
+        <div id="consentMsgTitle"></div>
+        <div id="consentMsgBody"></div>
+
+        <div class="consent-buttons">
+            <span class="deny-button" onclick="consentDeny()">Deny</span>
+            <span class="allow-button" onclick="consentAllow()">Allow</span>
+            <div id="errorMsgConsent">Oops!! Try Again.</div>
+        </div>
+    </div>
+
+</body>
+
+</html>

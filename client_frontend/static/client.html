@@ -1,0 +1,172 @@
+<html>
+
+<head>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&family=Source+Code+Pro&display=swap"
+        rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+        }
+
+        .client-header {
+            display: flex;
+            justify-content: center;
+        }
+
+        .client-header-content {
+            padding: 0.5rem;
+            border: 2px solid black;
+        }
+
+        .task-title {
+            margin: 1rem;
+            display: flex;
+            justify-content: center;
+        }
+
+        .scope-options {
+            margin: 1rem;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+
+        .scope-option-item {
+            display: inline-block;
+            width: 5rem;
+        }
+
+        .get-data-button-row {
+            display: flex;
+            justify-content: center;
+        }
+
+        .get-data {
+            cursor: pointer;
+            padding: 0.5rem 0.5rem;
+            background-color: #1A1F71;
+            color: white;
+            border-radius: 0.5rem;
+        }
+
+        .query-params,
+        .oauth-data {
+            margin: 1rem;
+            display: flex;
+            justify-content: center;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .query-param-content,
+        .oauth-data-content {
+            padding: 0.5rem;
+            border: 1px solid black;
+            border-radius: 0.5rem;
+            min-width: 35rem;
+            font-family: 'Source Code Pro', monospace;
+        }
+
+        .box-title {
+            font-family: 'Roboto', sans-serif;
+            font-style: italic;
+        }
+    </style>
+</head>
+<script>
+    const initialState = "123"
+    const profileHost = "http://127.0.0.1:7001/site/userConsent.html"
+    const queryParams = "?client_id=localhostClient&redirect_uri=http://127.0.0.1:7000/site/client.html&response_type=code&state=" + initialState;
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const error = urlParams.get('error');
+    const error_description = urlParams.get('error_description');
+    const code = urlParams.get('code');
+    const state = urlParams.get('state');
+
+    // generate response query param html
+    let resQueryHtml = "";
+    if (error) resQueryHtml += "<span>error: " + error + "</span><br/>";
+    if (error_description) resQueryHtml += "<span>error_description: " + error_description + "</span><br/>";
+    if (code) resQueryHtml += "<span>code: " + code + "</span><br/>";
+    if (state) resQueryHtml += "<span>state: " + state + "</span><br/>";
+
+    window.onload = function () {
+        if (error || code) {
+            document.getElementById("responseQueryParams").classList.add("query-param-content")
+            document.getElementById("responseQueryParams").innerHTML = "<span class='box-title'>Query Params:</span><br /><br />" + resQueryHtml;
+        }
+    }
+
+    if (code && initialState === state) {
+        let payload = {
+            "authCode": code
+        }
+        fetch("http://localhost:8080/exchangeAuthCodeAndGetData", {
+            method: "POST",
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+            .then(res => res.json().then(data => ({ status: res.status, body: data })))
+            .then(resObj => {
+                document.getElementById("oauthData").classList.add("oauth-data-content");
+                document.getElementById("oauthData").innerHTML = "<span class='box-title'>Data after exchanging the auth code for access token:</span><br /><br />" + JSON.stringify(resObj["body"], null, 2).replaceAll("\n", "<br>");
+            })
+    }
+
+    function getData() {
+        let scope = [];
+        if (document.querySelector('#favCity').checked) scope.push("favCity");
+        if (document.querySelector('#favCar').checked) scope.push("favCar");
+        if (document.querySelector('#favHero').checked) scope.push("favHero");
+
+        scope = scope.join(",");
+
+        if (scope.length == 0) scope = "favCity,favCar,favHero";
+
+        window.location.replace(profileHost + queryParams + "&scope=" + scope);
+    }
+</script>
+
+<body>
+    <div class="client-header">
+        <div class="client-header-content">
+            Client Website
+        </div>
+    </div>
+    <div class="task-title">
+        Select the data to be fetched from profile.com
+    </div>
+    <div class="scope-options">
+        <div>
+            <span class="scope-option-item">Fav City:&nbsp;</span><input type="checkbox" id="favCity" name="favCity">
+        </div>
+        <div>
+            <span class="scope-option-item">Fav Car:&nbsp;</span><input type="checkbox" id="favCar" name="favCar">
+        </div>
+        <div>
+            <span class="scope-option-item">Fav Hero:&nbsp;</span><input type="checkbox" id="favHero" name="favHero">
+        </div>
+    </div>
+    <div class="get-data-button-row">
+        <div class="get-data" onclick="getData()">
+            Get data from profile.com
+        </div>
+    </div>
+    <div class="query-params">
+        <div id="responseQueryParams">
+
+        </div>
+    </div>
+    <div class="oauth-data">
+        <div id="oauthData">
+
+        </div>
+    </div>
+</body>
+
+</html>
